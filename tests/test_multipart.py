@@ -175,7 +175,10 @@ def test_multipart_file_tuple_headers(file_content_type: str | None) -> None:
     )
 
 
-def test_multipart_headers_include_content_type() -> None:
+@pytest.mark.parametrize(
+    "header_name", ["Content-Type", "content-type", "CoNtEnT-TyPe"]
+)
+def test_multipart_headers_include_content_type(header_name: str) -> None:
     """
     Content-Type from 4th tuple parameter (headers) should
     override the 3rd parameter (content_type)
@@ -183,7 +186,7 @@ def test_multipart_headers_include_content_type() -> None:
     file_name = "test.txt"
     file_content = io.BytesIO(b"<file content>")
     file_content_type = "text/plain"
-    file_headers = {"Content-Type": "image/png"}
+    file_headers = {header_name: "image/png"}
 
     url = "https://www.example.com/"
     headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
@@ -199,10 +202,40 @@ def test_multipart_headers_include_content_type() -> None:
     }
     assert request.content == (
         f'--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
-        f'filename="{file_name}"\r\nContent-Type: '
+        f'filename="{file_name}"\r\n{header_name}: '
         f"image/png\r\n\r\n<file content>\r\n--BOUNDARY--\r\n"
         "".encode("ascii")
     )
+
+
+@pytest.mark.parametrize("header_name", ["X-Content-Type", "Content-Type-Options"])
+@pytest.mark.parametrize("file_content_type", [None, "application/json"])
+def test_multipart_headers_with_similar_content_type_name(
+    header_name: str, file_content_type: str | None
+) -> None:
+    headers = {"Content-Type": "multipart/form-data; boundary=BOUNDARY"}
+    files = {
+        "file": (
+            "test.txt",
+            b"<file content>",
+            file_content_type,
+            {header_name: "custom"},
+        )
+    }
+    request = httpx.Request(
+        "POST", "https://www.example.com/", headers=headers, files=files
+    )
+    request.read()
+
+    expected_content_type = file_content_type or "text/plain"
+    assert request.content == (
+        '--BOUNDARY\r\nContent-Disposition: form-data; name="file"; '
+        'filename="test.txt"\r\n'
+        f"{header_name}: custom\r\n"
+        f"Content-Type: {expected_content_type}\r\n\r\n"
+        "<file content>\r\n--BOUNDARY--\r\n"
+    ).encode("ascii")
+    assert request.headers["Content-Length"] == str(len(request.content))
 
 
 def test_multipart_encode(tmp_path: typing.Any) -> None:

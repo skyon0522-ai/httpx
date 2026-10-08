@@ -148,7 +148,7 @@ class FileField:
         if content_type is None:
             content_type = _guess_content_type(filename)
 
-        has_content_type_header = any("content-type" in key.lower() for key in headers)
+        has_content_type_header = any("content-type" == key.lower() for key in headers)
         if content_type is not None and not has_content_type_header:
             # note that unlike requests, we ignore the content_type provided in the 3rd
             # tuple element if it is also included in the headers requests does
